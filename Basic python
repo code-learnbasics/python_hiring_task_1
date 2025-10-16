@@ -1,0 +1,102 @@
+import os
+from PIL import Image
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.utils import ImageReader
+
+PAGE_WIDTH, PAGE_HEIGHT = A4  # 595 x 842 points
+
+def load_images(image_folder):
+    images = []
+    for filename in os.listdir(image_folder):
+        if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.gif')):
+            path = os.path.join(image_folder, filename)
+            with Image.open(path) as img:
+                images.append({
+                    'path': path,
+                    'width': img.width,
+                    'height': img.height,
+                    'aspect_ratio': img.width / img.height
+                })
+    return images
+
+def scale_images_to_fit_page(images, max_width=PAGE_WIDTH):
+    """Scale images proportionally to fit within the PDF page width."""
+    for img in images:
+        if img['width'] > max_width:
+            scale = max_width / img['width']
+            img['scaled_width'] = img['width'] * scale
+            img['scaled_height'] = img['height'] * scale
+        else:
+            img['scaled_width'] = img['width']
+            img['scaled_height'] = img['height']
+    return images
+
+def arrange_images(images):
+    """Pack images into shelves (rows) using a simple shelf-packing algorithm."""
+    shelves = []
+    current_shelf = []
+    current_width = 0
+    shelf_y = 0
+    max_shelf_height = 0
+
+    for img in images:
+        if current_width + img['scaled_width'] > PAGE_WIDTH:
+            shelves.append({
+                'images': current_shelf,
+                'y': shelf_y,
+                'height': max_shelf_height
+            })
+            shelf_y += max_shelf_height
+            current_shelf = []
+            current_width = 0
+            max_shelf_height = 0
+
+        current_shelf.append(img)
+        img['x'] = current_width
+        img['y'] = shelf_y
+        current_width += img['scaled_width']
+        max_shelf_height = max(max_shelf_height, img['scaled_height'])
+
+    if current_shelf:
+        shelves.append({
+            'images': current_shelf,
+            'y': shelf_y,
+            'height': max_shelf_height
+        })
+
+    return shelves
+
+def create_pdf(shelves, output_path="output.pdf"):
+    c = canvas.Canvas(output_path, pagesize=A4)
+    y_cursor = 0
+
+    for shelf in shelves:
+        if y_cursor + shelf['height'] > PAGE_HEIGHT:
+            c.showPage()
+            y_cursor = 0
+
+        for img in shelf['images']:
+            img_obj = ImageReader(img['path'])
+            draw_y = PAGE_HEIGHT - (img['y'] - y_cursor + img['scaled_height'])  # from bottom
+            c.drawImage(
+                img_obj,
+                img['x'],
+                draw_y,
+                width=img['scaled_width'],
+                height=img['scaled_height'],
+                preserveAspectRatio=True
+            )
+        y_cursor += shelf['height']
+
+    c.save()
+    print(f"PDF saved as {output_path}")
+
+def pack_images_to_pdf(image_folder, output_pdf):
+    images = load_images(image_folder)
+    images = scale_images_to_fit_page(images)
+    shelves = arrange_images(images)
+    create_pdf(shelves, output_pdf)
+
+# Example usage:
+# pack_images_to_pdf("path/to/image/folder", "packed_output.pdf")
