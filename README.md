@@ -70,3 +70,9 @@ Follow these steps to get started:
 2. **Implement a command-line interface** for running the program.
 3. **Add documentation** to explain the program's functionality.
 4. **Implement error handling** for handling edge cases.
+
+## Note
+
+1. The background of the final image must be transparent.
+2. Make sure the packing of images in a page is more optimized (doesn't have lot of empty spaces)
+3. There shouldn't be similar images throughout the final PDF. Also, make sure that all the images provided are packed.
